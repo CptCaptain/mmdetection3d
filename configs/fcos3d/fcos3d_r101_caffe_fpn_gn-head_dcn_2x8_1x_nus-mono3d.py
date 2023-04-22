@@ -54,7 +54,7 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=2,
+    samples_per_gpu=4,
     workers_per_gpu=2,
     train=dict(pipeline=train_pipeline),
     val=dict(pipeline=test_pipeline),
@@ -73,3 +73,28 @@ lr_config = dict(
     step=[8, 11])
 total_epochs = 12
 evaluation = dict(interval=2)
+checkpoint_config = dict(interval=2, max_keep_ckpts=3)
+workflow=[('train', 1), ('val', 1)]
+
+
+log_config = dict(
+    interval=10,
+    hooks=[
+        dict(type='MMDetWandbHook',
+          by_epoch=True,
+          init_kwargs=dict(
+            entity="nkoch-aitastic",
+            project='van-detection3d',
+            tags=[
+              'backbone:ResNet101',
+              'neck:FPN',
+              'head:FCOS3D',
+              'pretrained',
+              ]
+          ),
+          log_checkpoint=True,
+          log_checkpoint_metadata=True,
+          num_eval_images=100,
+        ), # Check https://docs.wandb.ai/ref/python/init for more init arguments.
+        dict(type='TextLoggerHook', by_epoch=True),
+    ])
