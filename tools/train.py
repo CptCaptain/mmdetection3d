@@ -22,6 +22,8 @@ from mmdet3d.utils import collect_env, get_root_logger
 from mmdet.apis import set_random_seed
 from mmseg import __version__ as mmseg_version
 
+import datetime
+
 try:
     # If mmdet version > 2.20.0, setup_multi_processes would be imported and
     # used from mmdet instead of mmdet3d.
@@ -168,7 +170,7 @@ def main():
         distributed = False
     else:
         distributed = True
-        init_dist(args.launcher, **cfg.dist_params)
+        init_dist(args.launcher, timeout=datetime.timedelta(seconds=8400),**cfg.dist_params)
         # re-set gpu_ids with distributed training mode
         _, world_size = get_dist_info()
         cfg.gpu_ids = range(world_size)
