@@ -31,7 +31,7 @@ def get_run_config(run_id):
 # Get name of run
 def get_run_name(run_id):
     run = get_run(run_id)
-    return run.name
+    return run.name.replace('/', '_')
 
 # Get tags of run
 def get_run_tags(run_id):
@@ -44,6 +44,8 @@ def get_run_gpu_ids(run_id):
 
 def get_run_runtime_hours(run_id):
     run = get_run(run_id)
+    if not '_wandb' in run.summary:
+        return 0
     return run.summary['_wandb']['runtime']/3600
 
 # Function to download the checkpoint using W&B API
@@ -69,8 +71,8 @@ def json_to_python(obj):
             img_scale = obj['img_scale']
             obj['img_scale'] = [tuple(img_scale),]  # Convert to list[tuple[int, int]] format
         # special case for renamed models
-        if obj.get('type') == 'VAN':
-            obj['type'] = 'VAN_Official'
+        # if obj.get('type') == 'VAN':
+            # obj['type'] = 'VAN_Official'
         for k, v in obj.items():
             if isinstance(v, str) and v.startswith('/content/'):
                 obj[k] = obj[k].replace('/content/', '')
@@ -111,7 +113,7 @@ def run_test_script(config_path, checkpoint_path, result_path, eval=False):
     with open(result_path + '_test_stdout.txt', 'w') as f:
         subprocess.run([
             "python",
-            "test.py",
+            "tools/test.py",
             config_path,
             checkpoint_path,
             *out,
@@ -126,26 +128,18 @@ def run_analysis(config_path, result_path, analysis_output_dir):
     # Get FLOPs
     print('Calculating Complexity')
     with open(os.path.join(analysis_output_dir, "get_flops.txt"), "w") as f:
-        subprocess.run(["python", f"{tool_path}/get_flops.py", config_path], stdout=f)
-
-    # COCO error analysis
-    print('Analyzing Errors')
-    with open(os.path.join(analysis_output_dir, "coco_error_analysis.txt"), "w") as f:
-        subprocess.run(["python", f"{tool_path}/coco_error_analysis.py", result_path + '.bbox.json', analysis_output_dir], stdout=f)
-
-    # Robustness
-    # print('Evaluating robustness')
-    # with open(os.path.join(analysis_output_dir, "robustness_eval.txt"), "w") as f:
-        # subprocess.run(["python", f"{tool_path}/robustness_eval.py", result_path + '_test_robustness.pkl'], stdout=f)
+        subprocess.run(["python", f"{tool_path}/get_flops.py", config_path, "--modality", "image"], stdout=f)
 
     # Benchmark
     print('Benchmarking')
-    os.environ['LOCAL_RANK'] = "0"
-    with open(os.path.join(analysis_output_dir, "benchmark.txt"), "w") as f:
+    # os.environ['LOCAL_RANK'] = "0"
+    out_path = os.path.join(analysis_output_dir, "benchmark.txt")
+    with open(out_path, "w") as f:
         print(' '.join(["python", "-m", "torch.distributed.launch", "--nproc_per_node=1", "--master_port=29500",
                         f"{tool_path}/benchmark.py", config_path, checkpoint_path]))
-        subprocess.run(["python", "-m", "torch.distributed.launch", "--nproc_per_node=1", "--master_port=29500",
-                        f"{tool_path}/benchmark.py", config_path, checkpoint_path, '--launcher', 'pytorch'], stdout=f)
+        # subprocess.run(["python", "-m", "torch.distributed.launch", "--nproc_per_node=1", "--master_port=29500",
+                          # f"{tool_path}/benchmark.py", config_path, checkpoint_path], stdout=f)
+        subprocess.run(["torchrun", f"{tool_path}/benchmark.py", config_path, checkpoint_path], stdout=f)
 
 def analyze_and_summarize(run_name, analysis_dir):
     summary = {'run_name': run_name}
@@ -192,9 +186,18 @@ def analyze_and_summarize(run_name, analysis_dir):
     result_file = os.path.join("eval_dir", "results", f"{run_name}_test_stdout.txt")
     with open(result_file, "r") as f:
         content = f.read()
-        bbox_mAP = re.search(r'\(\'bbox_mAP\', (.+?)\)', content)
-        if bbox_mAP:
-            summary['bbox_mAP'] = float(bbox_mAP.group(1))
+        mAP = re.search(r'mAP: (.+)', content)
+        mATE = re.search(r'mATE: (.+)', content)
+        mAOE = re.search(r'mAOE: (.+)', content)
+        mASE = re.search(r'mASE: (.+)', content)
+        NDS = re.search(r'NDS: (.+)', content)
+        if mAP:
+            summary['mAP'] = float(mAP.group(1))
+            summary['mATE'] = float(mATE.group(1))
+            summary['mASE'] = float(mASE.group(1))
+            summary['mAOE'] = float(mAOE.group(1))
+            summary['NDS'] = float(NDS.group(1))
+        print(summary)
     
     return summary
 
@@ -248,7 +251,7 @@ for run_id in tqdm(run_list):
         run_test_script(config_path, checkpoint_path, result_path, eval=True)
 
     # Run further analysis and store the results
-    run_analysis(config_path, result_path, analysis_output_dir)
+    # run_analysis(config_path, result_path, analysis_output_dir)
 
     # Analyze and summarize
     summary = analyze_and_summarize(run_name, "eval_dir/analysis")
