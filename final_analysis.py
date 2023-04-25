@@ -70,9 +70,6 @@ def json_to_python(obj):
         if 'img_scale' in obj:
             img_scale = obj['img_scale']
             obj['img_scale'] = [tuple(img_scale),]  # Convert to list[tuple[int, int]] format
-        # special case for renamed models
-        # if obj.get('type') == 'VAN':
-            # obj['type'] = 'VAN_Official'
         for k, v in obj.items():
             if isinstance(v, str) and v.startswith('/content/'):
                 obj[k] = obj[k].replace('/content/', '')
@@ -249,9 +246,6 @@ for run_id in tqdm(run_list):
         # only run test script if we don't have results already, it's expensive
         run_test_script(config_path, checkpoint_path, result_path)
         run_test_script(config_path, checkpoint_path, result_path, eval=True)
-
-    # Run further analysis and store the results
-    # run_analysis(config_path, result_path, analysis_output_dir)
 
     # Analyze and summarize
     summary = analyze_and_summarize(run_name, "eval_dir/analysis")
