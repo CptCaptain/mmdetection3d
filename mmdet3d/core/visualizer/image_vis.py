@@ -170,7 +170,8 @@ def draw_camera_bbox3d_on_img(bboxes3d,
                               cam2img,
                               img_metas,
                               color=(0, 255, 0),
-                              thickness=1):
+                              thickness=1,
+                              plot=True):
     """Project the 3D bbox on 2D plane and draw on input image.
 
     Args:
@@ -203,4 +204,7 @@ def draw_camera_bbox3d_on_img(bboxes3d,
     uv_origin = (uv_origin - 1).round()
     imgfov_pts_2d = uv_origin[..., :2].reshape(num_bbox, 8, 2).numpy()
 
-    return plot_rect3d_on_img(img, num_bbox, imgfov_pts_2d, color, thickness)
+    if plot:
+        return plot_rect3d_on_img(img, num_bbox, imgfov_pts_2d, color, thickness)
+    return img, num_bbox, imgfov_pts_2d, color, thickness
+
