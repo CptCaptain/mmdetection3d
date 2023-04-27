@@ -224,7 +224,7 @@ for run_id in tqdm(run_list):
     write_config_file(config, config_path)
 
 try:
-    with open(results_dir + '/bs_summary.json', 'w') as f:
+    with open(results_dir + '/bs_summary.json', 'r') as f:
         all_summaries = json.load(f)
 except:
     all_summaries = {}
